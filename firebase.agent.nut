@@ -1,9 +1,10 @@
-// =============================================================================
-// FIREBASE --------------------------------------------------------------------
-// ============================================================================{
+// Copyright (c) 2015 Electric Imp
+// This file is licensed under the MIT License
+// http://opensource.org/licenses/MIT
+
 class Firebase {
     // Library version
-    static version = [2,0,0];
+    static version = [1,1,0];
     static KEEP_ALIVE = 60;     // Timeout for streaming
 
     // General
@@ -59,19 +60,23 @@ class Firebase {
         // if we already have a stream open, don't open a new one
         if (isStreaming()) return false;
 
+        if (typeof uriParams == "function") {
+            onError = uriParams;
+            uriParams = null;
+        }
         if (onError == null) onError = _defaultErrorHandler.bindenv(this);
         _streamingRequest = http.get(_buildUrl(path, uriParams), _streamingHeaders);
         _streamingRequest.setvalidation(VALIDATE_USING_SYSTEM_CA_CERTS);
 
         _streamingRequest.sendasync(
-            _onStreamExitFactory(path, onError).bindenv(this),
-            _onStreamDataFactory(path, onError).bindenv(this),
+            _onStreamExitFactory(path, onError),
+            _onStreamDataFactory(path, onError),
             NO_TIMEOUT
         );
 
         // Tickle the keepalive timer
         if (_keepAliveTimer) imp.cancelwakeup(_keepAliveTimer);
-        _keepAliveTimer = imp.wakeup(KEEP_ALIVE, _onKeepAliveExpiredFactory(path, onError).bindenv(this));
+        _keepAliveTimer = imp.wakeup(KEEP_ALIVE, _onKeepAliveExpiredFactory(path, onError));
 
         // Return true if we opened the stream
         return true;
@@ -147,6 +152,10 @@ class Firebase {
      *                 executed once the data is read
      **************************************************************************/
      function read(path, uriParams = null, callback = null) {
+        if (typeof uriParams == "function") {
+            callback = uriParams;
+            uriParams = null;
+        }
         local request = http.get(_buildUrl(path, uriParams), _defaultHeaders)
         request.setvalidation(VALIDATE_USING_SYSTEM_CA_CERTS);
         request.sendasync(function(res) {
@@ -319,7 +328,7 @@ class Firebase {
                 // Invoke our error handler
                 imp.wakeup(0, function() { onError(resp); });
             }
-        };
+        }.bindenv(this);
     }
 
     // Stream Callback
@@ -364,7 +373,7 @@ class Firebase {
                     }
                 }
             }
-        };
+        }.bindenv(this);
     }
 
     // No keep alive has been seen for a while, lets reconnect
@@ -565,6 +574,3 @@ class Firebase {
     }
 
 }
-// =============================================================================
-// ---------------------------------------------------------------- END_FIREBASE
-// ============================================================================}
